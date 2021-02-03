@@ -546,7 +546,7 @@ public class Notification extends CordovaPlugin {
             messageview.setTextDirection(android.view.View.TEXT_DIRECTION_LOCALE);
         }
 
-        applyWorkaroundForButtonWidthsTooWide(dialog.getButton(AlertDialog.BUTTON_POSITIVE));
+        applyWorkaroundForButtonWidthsTooWide(dialog.getButton(AlertDialog.BUTTON_NEGATIVE));
     }
 
     // From https://stackoverflow.com/a/32001524
