@@ -27,8 +27,14 @@ import android.content.res.Resources;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import android.widget.Space;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -511,8 +517,10 @@ public class Notification extends CordovaPlugin {
     @SuppressLint("NewApi")
     private Builder createDialog(CordovaInterface cordova) {
         int currentapiVersion = android.os.Build.VERSION.SDK_INT;
-        if (currentapiVersion >= android.os.Build.VERSION_CODES.HONEYCOMB) {
-            return new Builder(cordova.getActivity(), AlertDialog.THEME_DEVICE_DEFAULT_LIGHT);
+        if (currentapiVersion >= android.os.Build.VERSION_CODES.HONEYCOMB && currentapiVersion < android.os.Build.VERSION_CODES.M) {
+            return new Builder(cordova.getActivity(), android.app.AlertDialog.THEME_DEVICE_DEFAULT_LIGHT);
+        } else if (currentapiVersion >= android.os.Build.VERSION_CODES.M) {
+            return new Builder(cordova.getActivity(), android.R.style.Theme_DeviceDefault_Light_Dialog_Alert);
         } else {
             return new Builder(cordova.getActivity());
         }
@@ -537,5 +545,55 @@ public class Notification extends CordovaPlugin {
             TextView messageview = (TextView)dialog.findViewById(android.R.id.message);
             messageview.setTextDirection(android.view.View.TEXT_DIRECTION_LOCALE);
         }
+
+        applyWorkaroundForButtonWidthsTooWide(dialog.getButton(AlertDialog.BUTTON_POSITIVE));
+    }
+
+    // From https://stackoverflow.com/a/32001524
+    public static void applyWorkaroundForButtonWidthsTooWide(Button dialogButton) {
+        int currentapiVersion = android.os.Build.VERSION.SDK_INT;
+        if(currentapiVersion >= android.os.Build.VERSION_CODES.M)
+            return;
+
+        if (dialogButton == null)
+            return;
+        if (!(dialogButton.getParent() instanceof LinearLayout))
+            return;
+
+        // Workaround for buttons too large in alternate languages.
+        final LinearLayout linearLayout = (LinearLayout) dialogButton.getParent();
+        linearLayout.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop,
+                                       int oldRight, int oldBottom) {
+                if (right - left > 0) {
+                    final int parentWidth = linearLayout.getWidth();
+                    int childrenWidth = 0;
+                    for (int i = 0; i < linearLayout.getChildCount(); ++i)
+                        childrenWidth += linearLayout.getChildAt(i).getWidth();
+
+                    if (childrenWidth > parentWidth) {
+                        // Apply stacked buttons
+                        linearLayout.setOrientation(LinearLayout.VERTICAL);
+                        linearLayout.setPadding(linearLayout.getPaddingLeft(), 0, linearLayout.getPaddingRight(),
+                                linearLayout.getPaddingBottom());
+                        for (int i = 0; i < linearLayout.getChildCount(); ++i) {
+                            if (linearLayout.getChildAt(i) instanceof Button) {
+                                final Button child = (Button) linearLayout.getChildAt(i);
+                                child.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                                final LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) child.getLayoutParams();
+                                params.width = LinearLayout.LayoutParams.MATCH_PARENT;
+                                params.gravity = Gravity.END;
+                                child.setLayoutParams(params);
+                            } else if (linearLayout.getChildAt(i) instanceof Space) {
+                                linearLayout.removeViewAt(i--);
+                            }
+                        }
+                    }
+
+                    linearLayout.removeOnLayoutChangeListener(this);
+                }
+            }
+        });
     }
 }
